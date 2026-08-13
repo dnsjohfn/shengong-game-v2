@@ -1,0 +1,16 @@
+{
+  "name": "深宫浮生录",
+  "short_name": "深宫录",
+  "description": "宫廷养成文字游戏：从八岁入宫到独当一面，历经四季更迭与武试大典。",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#88231d",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

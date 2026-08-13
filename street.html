@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>上街</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#88231d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="深宫浮生录">
+    <link rel="icon" type="image/png" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-180.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html,
+        body {
+            height: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        #root_canvas {
+            aspect-ratio: 16 / 9;
+            /* 同时受宽度与高度约束：手机横屏（比 16:9 更宽）时按高度适配，避免上下裁切 */
+            width: min(100vw, calc(100vh * 16 / 9), 1600px);
+            position: relative;
+            overflow: hidden;
+            container-type: inline-size;
+        }
+
+        /* 返回按钮 */
+        .back_btn {
+            position: absolute;
+            left: 2%;
+            top: 2%;
+            z-index: 30;
+            background: rgba(136, 35, 29, 0.95);
+            color: #fff;
+            border: 2px solid #88231d;
+            border-radius: 12px;
+            padding: 0.8cqw 1.5cqw;
+            font-size: 1.5cqw;
+            cursor: pointer;
+        }
+
+        .back_btn:hover {
+            background: #88231d;
+        }
+
+        /* 左侧人物区域 */
+        .left_portrait {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 26%;
+            height: 100%;
+            z-index: 20;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .left_portrait img {
+            width: auto;
+            height: 150%;
+            max-width: 150%;
+            object-fit: contain;
+            object-position: center center;
+        }
+
+        /* 右侧场景区域（背景图片放大） */
+        .right_scene {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 74%;
+            height: 100%;
+            z-index: 1;
+            background-size: 110% 110%;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        /* 右侧场景选择按钮 */
+        .scene_sidebar {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 74%;
+            height: 100%;
+            z-index: 25;
+            pointer-events: none;
+        }
+
+        .scene_list {
+            position: absolute;
+            right: 1%;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12%;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6vh;
+            pointer-events: auto;
+        }
+
+        .scene_btn {
+            background: rgba(136, 35, 29, 0.85);
+            color: #fff;
+            border: 2px solid #88231d;
+            border-radius: 12px;
+            width: 100%;
+            padding: 0.6vh 0;
+            font-size: 1.2cqw;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+
+        .scene_btn:hover,
+        .scene_btn.active {
+            background: #88231d;
+            transform: scale(1.05);
+        }
+
+        /* 底部操作按钮栏 */
+        .bottom_actions {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            height: 18%;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 22;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 0 20px;
+        }
+
+        .action_btn {
+            background: #88231d;
+            color: #fff;
+            border: 2px solid #88231d;
+            border-radius: 12px;
+            padding: 0.8cqw 1.5cqw;
+            font-size: 1.5cqw;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .action_btn:hover {
+            background: #9c2821;
+            transform: scale(1.05);
+        }
+
+        /* 遮罩 */
+        .overlay {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* 行动结果弹窗（白色背景，仅确定按钮为红色） */
+        .action_result_pop {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+            display: none;
+        }
+
+        .action_result_mask {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1;
+        }
+
+        .action_result_panel {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 42%;
+            background: #fff;
+            border: 2px solid #88231d;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ar_head {
+            background: #fff;
+            padding: 1cqw 0;
+            text-align: center;
+        }
+
+        .ar_title {
+            color: #7c201b;
+            font-size: 2.2cqw;
+            letter-spacing: 6px;
+            font-weight: bold;
+        }
+
+        .ar_body {
+            background: #fff;
+            padding: 1.8cqw 2cqw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ar_text {
+            color: #333;
+            font-size: 1.7cqw;
+            line-height: 1.9;
+            text-align: center;
+            white-space: pre-line;
+        }
+
+        .ar_points {
+            color: #a03028;
+            font-size: 1.5cqw;
+            letter-spacing: 2px;
+        }
+
+        .ar_foot {
+            background: #fff;
+            padding: 1cqw 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .ar_ok {
+            width: 34%;
+            height: 4cqw;
+            background: #88231d;
+            border-radius: 12px;
+            box-shadow: 0 5px 14px rgba(0, 0, 0, 0.4);
+            color: #fff;
+            font-size: 1.6cqw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: 0.2s;
+            user-select: none;
+        }
+
+        .ar_ok:hover {
+            background: #9c2821;
+            transform: scale(1.04);
+        }
+
+        .ar_ok:active {
+            transform: scale(0.96);
+        }
+
+        /* 选项弹窗（白底红边选项） */
+        .ac_options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            width: 100%;
+        }
+
+        .ac_option {
+            background: #fff;
+            border: 2px solid #88231d;
+            border-radius: 12px;
+            color: #7c201b;
+            font-size: 1.6cqw;
+            padding: 1.2cqw 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: 0.2s;
+            user-select: none;
+        }
+
+        .ac_option:hover {
+            background: #fff3ef;
+            transform: scale(1.04);
+        }
+
+        .ac_option:active {
+            transform: scale(0.96);
+        }
+
+        /* 手机横屏引导页（竖屏时显示；点击按钮进入全屏锁定横屏） */
+        #rotateTip {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 99999;
+            background: rgba(20, 10, 10, 0.55);
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+        }
+
+        #rotateTip.show {
+            display: flex;
+        }
+
+        #rotateTip .tip_panel {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            width: 84%;
+            max-width: 380px;
+            padding: 28px 22px;
+            border-radius: 16px;
+            background: #8a2424;
+            border: 2px solid #c0392b;
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        #rotateTip .tip_icon {
+            font-size: 46px;
+            animation: tilt 1.6s ease-in-out infinite;
+        }
+
+        #rotateTip .tip_text {
+            font-size: 16px;
+            line-height: 1.8;
+            margin: 16px 0 22px;
+            letter-spacing: 1px;
+        }
+
+        #rotateTip .tip_btn {
+            display: inline-block;
+            background: #fff;
+            color: #88231d;
+            border: none;
+            border-radius: 999px;
+            font-size: 17px;
+            font-weight: bold;
+            padding: 12px 32px;
+            letter-spacing: 2px;
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #rotateTip .tip_btn:active {
+            transform: scale(0.95);
+        }
+
+        #rotateTip .tip_hint {
+            margin-top: 14px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.72);
+        }
+
+        /* iOS 兜底：已点击进入但无法锁屏时，旋转画面并显示顶部小提示 */
+        #rotateTip.minimized {
+            background: transparent;
+            justify-content: flex-start;
+            align-items: flex-start;
+            padding-top: max(12px, env(safe-area-inset-top));
+            pointer-events: none;
+        }
+
+        #rotateTip.minimized .tip_panel {
+            margin: 0 auto;
+            padding: 9px 18px;
+            border-radius: 999px;
+            background: rgba(26, 16, 16, 0.9);
+            font-size: 13px;
+            border-color: #a03830;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+        }
+
+        #rotateTip.minimized .tip_btn,
+        #rotateTip.minimized .tip_hint {
+            display: none;
+        }
+
+        @keyframes tilt {
+
+            0%,
+            100% {
+                transform: rotate(0deg);
+            }
+
+            50% {
+                transform: rotate(90deg);
+            }
+        }
+
+        /* ===== 移动端触屏：禁用 hover 粘滞（点击后放大/变色残留） ===== */
+        @media (hover: none) {
+
+            img[class^="btn_"]:hover,
+            .cover_btn img:hover,
+            .game_btn:hover,
+            .btn_back:hover,
+            .btn_confirm:hover,
+            .save_slot:hover,
+            .save_slot_auto:hover,
+            .status_btn:hover,
+            .diary_page_btn:hover,
+            .bag_item_btn:hover,
+            .talk_btn:hover,
+            .action_drag:hover,
+            .action_btn:hover,
+            .scene_btn:hover,
+            .back_btn:hover,
+            .ar_ok:hover,
+            .ac_option:hover {
+                transform: none;
+            }
+
+            .action_drag:hover,
+            .ac_option:hover {
+                background: #fff;
+            }
+
+            .action_drag.selected:hover {
+                background: #88231d;
+            }
+
+            .scene_btn:hover,
+            .action_btn:hover,
+            .game_btn:hover,
+            .btn_back:hover,
+            .back_btn:hover,
+            .status_btn:hover,
+            .diary_page_btn:hover,
+            .talk_btn:hover,
+            .ar_ok:hover {
+                background: #88231d;
+            }
+
+            .talk_send_btn:hover {
+                background: #a03028;
+            }
+
+            .btn_confirm:hover,
+            .bag_item_btn:hover {
+                background: #9c2821;
+            }
+
+            .save_slot:hover,
+            .save_slot_auto:hover {
+                background: #441c1c;
+            }
+        }
+
+        /* ===== 手机竖屏自动横屏（画面旋转 90° 铺满竖屏；由 .portrait-rotate 类控制，JS 仅在竖屏时添加） ===== */
+        html.portrait-rotate #root_canvas {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 100vh;
+            height: 100vw;
+            max-width: none;
+            transform: translate(-50%, -50%) rotate(90deg);
+        }
+
+        html.portrait-rotate .status_canvas,
+        html.portrait-rotate .plan_wrap {
+            width: 100% !important;
+            height: 100% !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root_canvas">
+        <button class="back_btn" id="backToGame">返回</button>
+        <!-- 左侧人物 -->
+        <div class="left_portrait">
+            <img src="renwulihui/立绘2.webp" alt="人物立绘" id="portraitImg">
+        </div>
+        <!-- 右侧场景 -->
+        <div class="right_scene" id="sceneBg"></div>
+        <!-- 右侧场景选择按钮（已移除李府） -->
+        <div class="scene_sidebar">
+            <div class="scene_list">
+                <div class="scene_btn active" data-scene="xishi">西市</div>
+                <div class="scene_btn" data-scene="yanwuchang">演武场</div>
+                <div class="scene_btn" data-scene="chunfenglou">春风楼</div>
+                <div class="scene_btn" data-scene="dongshi">东市</div>
+                <div class="scene_btn" data-scene="jiaowai">郊外</div>
+                <div class="scene_btn" data-scene="lihuayuan">梨花园</div>
+                <div class="scene_btn" data-scene="sanqingguan">三清观</div>
+                <div class="scene_btn" data-scene="shuyuan">书院</div>
+            </div>
+        </div>
+        <!-- 底部操作按钮 -->
+        <div class="bottom_actions">
+            <div class="action_btn"></div>
+            <div class="action_btn"></div>
+            <div class="action_btn"></div>
+        </div>
+        <div class="overlay"></div>
+        <!-- 行动结果弹窗 -->
+        <div class="action_result_pop" id="actionResultPop">
+            <div class="action_result_mask" id="actionResultMask"></div>
+            <div class="action_result_panel">
+                <div class="ar_head">
+                    <div class="ar_title" id="arTitle">行动</div>
+                </div>
+                <div class="ar_body">
+                    <div class="ar_text" id="arText"></div>
+                    <div class="ar_points" id="arPoints"></div>
+                </div>
+                <div class="ar_foot">
+                    <div class="ar_ok" id="arOk">确定</div>
+                </div>
+            </div>
+        </div>
+        <!-- 行动选项弹窗（吃食/听书等） -->
+        <div class="action_result_pop" id="actionChoicePop">
+            <div class="action_result_mask" id="actionChoiceMask"></div>
+            <div class="action_result_panel">
+                <div class="ar_head">
+                    <div class="ar_title" id="acTitle">选择</div>
+                </div>
+                <div class="ar_body">
+                    <div class="ac_options" id="acOptions"></div>
+                </div>
+                <div class="ar_foot">
+                    <div class="ar_ok" id="acCancel">取消</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 手机横屏引导（竖屏时显示；点击按钮进入全屏锁定横屏） -->
+    <div id="rotateTip">
+        <div class="tip_panel">
+            <div class="tip_icon">📱</div>
+            <div class="tip_text">本游戏为横屏体验<br>请旋转手机或点击下方按钮</div>
+            <button class="tip_btn" id="rotateGoBtn" type="button">进入横屏模式</button>
+            <div class="tip_hint">点击后进入全屏横屏游玩</div>
+        </div>
+    </div>
+    <script>
+        // 场景图片映射
+        const sceneImages = {
+            xishi: "xishi.webp",
+            yanwuchang: "yanwuchang.webp",
+            chunfenglou: "chunfenglou.webp",
+            dongshi: "dongshi.webp",
+            jiaowai: "jiaowai.webp",
+            lihuayuan: "lihuayuan.webp",
+            sanqingguan: "sanqingguan.webp",
+            shuyuan: "shuyuan.webp"
+        };
+
+        // 各场景对应底部按钮配置（完全匹配你的需求）
+        const sceneActionConfig = {
+            xishi: ["玉销记", "美人笑", "拍卖行"],
+            yanwuchang: ["与人对练", "看人对练"],
+            chunfenglou: ["吃食", "听书"],
+            dongshi: ["大理寺", "衙门", "医馆"],
+            jiaowai: ["黑市"],
+            lihuayuan: ["观戏"],
+            sanqingguan: ["上香"],
+            shuyuan: ["藏书楼"]
+        };
+
+        const sceneBg = document.getElementById("sceneBg");
+        const sceneBtns = document.querySelectorAll(".scene_btn");
+        const actionBtns = document.querySelectorAll(".action_btn");
+
+        // 读取上次停留场景，默认西市
+        let currentScene = localStorage.getItem("lastStreetScene") || "xishi";
+
+        // 更新底部按钮文字与显示状态
+        function refreshActionButtons(sceneKey) {
+            const btnTexts = sceneActionConfig[sceneKey];
+            actionBtns.forEach((btn, index) => {
+                if (btnTexts[index]) {
+                    btn.innerText = btnTexts[index];
+                    btn.style.display = "block";
+                } else {
+                    btn.style.display = "none";
+                }
+            });
+        }
+
+        // 切换场景函数
+        function changeScene(name) {
+            currentScene = name;
+            // 更换背景图
+            sceneBg.style.backgroundImage = `url(${sceneImages[name]})`;
+            // 更新底部功能按钮
+            refreshActionButtons(name);
+            // 保存本地缓存
+            localStorage.setItem("lastStreetScene", name);
+            // 更新选中高亮
+            sceneBtns.forEach(btn => {
+                btn.classList.remove("active");
+                if (btn.dataset.scene === name) {
+                    btn.classList.add("active");
+                }
+            });
+        }
+
+        // 页面初始化
+        changeScene(currentScene);
+
+        // 场景按钮点击绑定
+        sceneBtns.forEach(btn => {
+            btn.onclick = function () {
+                changeScene(this.dataset.scene);
+            };
+        });
+
+        // 上街页人物立绘每年更换（读取主界面年龄，立绘1/2 两年一轮，初始为立绘2）
+        (function updateStreetPortrait() {
+            const img = document.getElementById("portraitImg");
+            if (!img) return;
+            let raw = localStorage.getItem("skipMonthCount");
+            let skip = raw ? Number(raw) : 0;
+            let age = 8 + Math.floor(skip / 12);
+            if (age < 8) age = 8;
+            const idx = ((age - 8 + 1) % 2) + 1;
+            img.src = `renwulihui/立绘${idx}.webp`;
+        })();
+
+        // 返回游戏主页（直接回到主界面，不显示封面）
+        document.getElementById("backToGame").onclick = function () {
+            location.href = "index.html?from=main";
+        };
+
+        // ===== 上街行动系统：对应属性增加，共享季度4个行动点 =====
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+        const StreetActionAttr = {
+            "美人笑": { emotion: [1, 1], beauty: [1, 1] },
+            "与人对练": { physique: [1, 1], force: [1, 1] },
+            "看人对练": { emotion: [1, 1], force: [1, 1] },
+            "吃食": { physique: [8, 15], emotion: [5, 10] },
+            "听书": { culture: [8, 15], intellect: [5, 10] },
+            "黑市": { force: [5, 10], magic: [5, 10], hate: [5, 15] },
+            "乱葬岗": { magic: [8, 15], force: [5, 10], hate: [8, 15] },
+            "上香": { emotion: [1, 1], hate: [1, 1] }
+        };
+        const ATTR_NAMES_S = { beauty: "美貌", physique: "体魄", culture: "文化", force: "武力", intellect: "智力", magic: "法力", emotion: "情感", hate: "仇恨" };
+        function loadStreetGame() {
+            try { const raw = localStorage.getItem("gameSave"); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+        }
+        function saveStreetGame(gs) { localStorage.setItem("gameSave", JSON.stringify(gs)); }
+        // 行动结果弹窗（古风三段式）
+        let arCallback = null;
+        function showActionResult(title, text, points, callback) {
+            document.getElementById("arTitle").innerText = title;
+            document.getElementById("arText").innerText = text;
+            document.getElementById("arPoints").innerText = points !== undefined ? points : "";
+            document.getElementById("actionResultPop").style.display = "block";
+            arCallback = callback || null;
+        }
+        function closeActionResult() {
+            document.getElementById("actionResultPop").style.display = "none";
+        }
+        document.getElementById("arOk").onclick = function () {
+            closeActionResult();
+            if (arCallback) { const cb = arCallback; arCallback = null; cb(); }
+        };
+        document.getElementById("actionResultMask").onclick = closeActionResult;
+        function getStreetPoints() {
+            let raw = localStorage.getItem("streetActionPoints");
+            let p = raw === null ? 4 : Number(raw);
+            return (isNaN(p) || p < 0) ? 0 : p;
+        }
+        function setStreetPoints(n) { localStorage.setItem("streetActionPoints", String(Math.max(0, n))); }
+        // 上街可购买的物品（放入背包）
+        const STREET_ITEMS = {
+            naigao: { id: "naigao", name: "奶糕", desc: "春风楼招牌的奶香糕点，软糯可口。" },
+            naicha: { id: "naicha", name: "奶茶", desc: "香浓的热奶茶，御寒暖胃。" },
+            chunfengzui: { id: "chunfengzui", name: "春风醉", desc: "春风楼名酒，入口甘醇，回味悠长。" },
+            wuxiahuaben: { id: "wuxiahuaben", name: "武侠话本", desc: "讲述江湖侠客快意恩仇的话本。" },
+            qingaihuaben: { id: "qingaihuaben", name: "情爱话本", desc: "缠绵悱恻的爱情故事话本。" },
+            xianxiahuaben: { id: "xianxiahuaben", name: "仙侠话本", desc: "充满奇遇的仙侠传奇话本。" },
+            yupei: { id: "yupei", name: "玉佩", desc: "温润白玉所制的玉佩。" },
+            chaizi: { id: "chaizi", name: "钗子", desc: "精致的发钗。" },
+            yanzhi: { id: "yanzhi", name: "胭脂", desc: "上好的胭脂。" }
+        };
+        // 添加物品到背包（与主界面共享 localStorage）
+        function addStreetItem(id, name, desc) {
+            let arr = [];
+            try {
+                let raw = localStorage.getItem("bagItems");
+                if (raw) {
+                    arr = JSON.parse(raw);
+                } else {
+                    // 首次添加：初始化为默认背包物品
+                    arr = [
+                        { id: "fushougao", name: "福寿膏", count: 1, desc: "一种珍贵的滋补良药，据说能温养气血、安神定魄。" },
+                        { id: "yanzhiyupei", name: "胭脂玉佩", count: 1, desc: "温润如脂的玉佩，散发淡淡胭脂香，是贵人赠予的信物。" }
+                    ];
+                }
+            } catch (e) { }
+            let found = arr.find(it => it.id === id);
+            if (found) {
+                found.count = (found.count || 1) + 1;
+            } else {
+                arr.push({ id: id, name: name, count: 1, desc: desc });
+            }
+            localStorage.setItem("bagItems", JSON.stringify(arr));
+        }
+        // 行动选项弹窗
+        function showChoice(title, options, onSelect) {
+            document.getElementById("acTitle").innerText = title;
+            const wrap = document.getElementById("acOptions");
+            wrap.innerHTML = "";
+            options.forEach(opt => {
+                const btn = document.createElement("div");
+                btn.className = "ac_option";
+                btn.innerText = opt.label;
+                btn.onclick = function () {
+                    closeActionChoice();
+                    onSelect(opt);
+                };
+                wrap.appendChild(btn);
+            });
+            document.getElementById("actionChoicePop").style.display = "block";
+        }
+        function closeActionChoice() {
+            document.getElementById("actionChoicePop").style.display = "none";
+        }
+        document.getElementById("acCancel").onclick = closeActionChoice;
+        document.getElementById("actionChoiceMask").onclick = closeActionChoice;
+        // ===== 黑市系统 =====
+        function showBlackChoice(gs) {
+            showChoice("黑市", [
+                { label: "极乐窟", key: "jileku" },
+                { label: "囮场", key: "echang" },
+                { label: "虎圈", key: "huquan" }
+            ], function (opt) {
+                if (opt.key === "jileku") blackJileku(gs);
+                else if (opt.key === "echang") blackEchang(gs);
+                else blackHuquan(gs);
+            });
+        }
+        // 极乐窟：购买/服用福寿膏
+        function blackJileku(gs) {
+            showChoice("极乐窟", [
+                { label: "购买福寿膏", key: "buy" },
+                { label: "不购买", key: "nobuy" }
+            ], function (opt) {
+                if (opt.key === "nobuy") {
+                    showActionResult("极乐窟", "你放弃购买，离开了极乐窟。");
+                    return;
+                }
+                addStreetItem("fushougao", "福寿膏", "一种珍贵的滋补良药，据说能温养气血、安神定魄。");
+                showChoice("福寿膏", [
+                    { label: "现在服用", key: "use" },
+                    { label: "保留在背包", key: "keep" }
+                ], function (opt2) {
+                    if (opt2.key === "keep") {
+                        showActionResult("福寿膏", "福寿膏已放入背包。");
+                        return;
+                    }
+                    useFushougao(gs);
+                });
+            });
+        }
+        // 服用福寿膏：所有属性-1，法力+44（第三次触发皇帝结局）
+        function useFushougao(gs) {
+            ["beauty", "physique", "culture", "force", "intellect", "magic", "emotion", "hate"].forEach(k => {
+                gs[k] = Math.max(0, (gs[k] || 0) - 1);
+            });
+            gs.magic = Math.min(999, (gs.magic || 0) + 44);
+            saveStreetGame(gs);
+            let count = Number(localStorage.getItem("fushougaoUseCount") || 0) + 1;
+            localStorage.setItem("fushougaoUseCount", String(count));
+            if (count === 1) {
+                showActionResult("福寿膏", "飘飘然的感觉，好神奇。\n法力+44");
+            } else if (count === 2) {
+                showActionResult("福寿膏", "我这算不算得了仙人灵药？\n我成仙了啊……\n法力+44");
+            } else {
+                showChoice("龙颜大怒", [
+                    { label: "实话实话", key: "truth" },
+                    { label: "担下罪责", key: "confess" }
+                ], function (opt) {
+                    if (opt.key === "truth") {
+                        showActionResult("或许死亡才是解脱", "皇帝龙颜大怒，废去一身本领，沦为废奴，驱逐出国，从此了无音讯，生死不明。");
+                    } else {
+                        showActionResult("人死后真的会下十八层地狱吗？公主，我好怕。", "皇帝震惊女儿的欺骗，立马捉拿，在皇城宫门斩首示众，公主被斥责禁足，众人议论纷纷。死后尸首被野狗啃食殆尽，尸骨无存。");
+                    }
+                });
+            }
+        }
+        // 囮场
+        function blackEchang(gs) {
+            showChoice("囮场", [
+                { label: "相公堂", key: "xianggong" },
+                { label: "藏金院", key: "cangjin" }
+            ], function (opt) {
+                gs.emotion = Math.max(0, (gs.emotion || 0) - 15);
+                if (opt.key === "xianggong") {
+                    gs.hate = Math.min(999, (gs.hate || 0) + 10);
+                    gs.beauty = Math.min(999, (gs.beauty || 0) + 10);
+                    saveStreetGame(gs);
+                    showActionResult("相公堂", "情感-15，仇恨+10，美貌+10");
+                } else {
+                    gs.intellect = Math.min(999, (gs.intellect || 0) + 20);
+                    saveStreetGame(gs);
+                    showActionResult("藏金院", "情感-15，智力+20");
+                }
+            });
+        }
+        // 虎圈
+        function blackHuquan(gs) {
+            showChoice("虎圈", [
+                { label: "斗兽场", key: "doushou" },
+                { label: "猪仔馆", key: "zhuzai" }
+            ], function (opt) {
+                gs.emotion = Math.max(0, (gs.emotion || 0) - 20);
+                gs.intellect = Math.min(999, (gs.intellect || 0) + 20);
+                gs.hate = Math.min(999, (gs.hate || 0) + 20);
+                gs.magic = Math.min(999, (gs.magic || 0) + 20);
+                saveStreetGame(gs);
+                showActionResult(opt.label, "情感-20，智力+20，仇恨+20，法力+20");
+            });
+        }
+        // 点击上街行动
+        actionBtns.forEach(btn => {
+            btn.onclick = function () {
+                const name = this.innerText.trim();
+                if (!name) return;
+                const gs = loadStreetGame();
+                if (!gs) { showActionResult("提示", "请先从主界面开始游戏"); return; }
+                // 检查行动点
+                const points = getStreetPoints();
+                if (points <= 0) {
+                    showActionResult("提示", "行动点不足！\n本季度行动点已用完，下个季度恢复。");
+                    return;
+                }
+                // 拍卖行：消耗2点行动点，智力/情感+1，随机获得1-3件物品
+                if (name === "拍卖行") {
+                    if (points < 2) {
+                        showActionResult("拍卖行", "行动点不足！\n拍卖行需要2点行动点。");
+                        return;
+                    }
+                    setStreetPoints(points - 2);
+                    gs.intellect = Math.min(999, (gs.intellect || 0) + 1);
+                    gs.emotion = Math.min(999, (gs.emotion || 0) + 1);
+                    const auctionPool = [
+                        { id: "wulinmiji", name: "武林秘籍", desc: "记载绝世武功的秘籍。", attr: { force: 5 } },
+                        { id: "daobanwulin", name: "盗版武林秘籍", desc: "粗制滥造的假秘籍。", attr: { force: -2 } },
+                        { id: "qianchaobaowu", name: "前朝宝物", desc: "前朝流传下来的宝物。", attr: { intellect: 3, culture: 3 } },
+                        { id: "daobanqianchao", name: "盗版前朝宝物", desc: "赝品前朝宝物。", attr: { intellect: -1, culture: -1 } },
+                        { id: "cangbaotu", name: "藏宝图", desc: "通往宝藏的地图。", attr: { intellect: 5, emotion: 5, culture: 5 } },
+                        { id: "daobancangbao", name: "盗版藏宝图", desc: "假的藏宝图。", attr: { intellect: -2, culture: -2, emotion: -2 } },
+                        { id: "xianjiafaqi", name: "仙家法器", desc: "蕴含仙力的法器。", attr: { intellect: 2, magic: 6, physique: 6 } },
+                        { id: "daobanxianjia", name: "盗版仙家法器", desc: "仿制的法器。", attr: { intellect: -2, magic: -2, physique: -2 } }
+                    ];
+                    // 一次只随机获得1件物品
+                    const shuffled = auctionPool.slice();
+                    for (let i = shuffled.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                    }
+                    const picked = shuffled.slice(0, 1);
+                    const gainedNames = [];
+                    picked.forEach(it => {
+                        for (const k in it.attr) {
+                            gs[k] = Math.min(999, Math.max(0, (gs[k] || 0) + it.attr[k]));
+                        }
+                        addStreetItem(it.id, it.name, it.desc);
+                        gainedNames.push(it.name);
+                    });
+                    saveStreetGame(gs);
+                    showActionResult("拍卖行", `智力+1，情感+1\n获得：${gainedNames.join("、")}`, `消耗2点行动点（剩余${getStreetPoints()}点）`);
+                    return;
+                }
+                const cfg = StreetActionAttr[name];
+                // 玉销记：弹出三选一（玉佩/钗子/胭脂），美貌+1，进背包
+                if (name === "玉销记") {
+                    setStreetPoints(points - 1);
+                    showChoice("玉销记", [
+                        { label: "玉佩", key: "yupei" },
+                        { label: "钗子", key: "chaizi" },
+                        { label: "胭脂", key: "yanzhi" }
+                    ], function (opt) {
+                        const it = STREET_ITEMS[opt.key];
+                        gs.beauty = Math.min(999, (gs.beauty || 0) + 1);
+                        saveStreetGame(gs);
+                        addStreetItem(it.id, it.name, it.desc);
+                        showActionResult(opt.label, `美貌+1，已放入背包`, `剩余行动点：${getStreetPoints()}点`);
+                    });
+                    return;
+                }
+                // 吃食：弹出四选一（奶糕/奶茶/春风醉进背包，春风宴情感+2）
+                if (name === "吃食") {
+                    setStreetPoints(points - 1);
+                    showChoice("吃食", [
+                        { label: "奶糕", key: "naigao" },
+                        { label: "奶茶", key: "naicha" },
+                        { label: "春风醉", key: "chunfengzui" },
+                        { label: "春风宴", key: "chunfengyan" }
+                    ], function (opt) {
+                        if (opt.key === "chunfengyan") {
+                            gs.emotion = Math.min(999, (gs.emotion || 0) + 2);
+                            saveStreetGame(gs);
+                            showActionResult("春风宴", "情感+2", `剩余行动点：${getStreetPoints()}点`);
+                        } else {
+                            const it = STREET_ITEMS[opt.key];
+                            gs.emotion = Math.min(999, (gs.emotion || 0) + 1);
+                            saveStreetGame(gs);
+                            addStreetItem(it.id, it.name, it.desc);
+                            showActionResult(opt.label, `情感+1，已放入背包`, `剩余行动点：${getStreetPoints()}点`);
+                        }
+                    });
+                    return;
+                }
+                // 听书：弹出三选一（话本均进背包）
+                if (name === "听书") {
+                    setStreetPoints(points - 1);
+                    showChoice("听书", [
+                        { label: "武侠话本", key: "wuxiahuaben", attr: "force" },
+                        { label: "情爱话本", key: "qingaihuaben", attr: "emotion" },
+                        { label: "仙侠话本", key: "xianxiahuaben", attr: "magic" }
+                    ], function (opt) {
+                        const it = STREET_ITEMS[opt.key];
+                        const attrName = { force: "武力", emotion: "情感", magic: "法术" }[opt.attr];
+                        gs[opt.attr] = Math.min(999, (gs[opt.attr] || 0) + 1);
+                        saveStreetGame(gs);
+                        addStreetItem(it.id, it.name, it.desc);
+                        showActionResult(opt.label, `${attrName}+1，已放入背包`, `剩余行动点：${getStreetPoints()}点`);
+                    });
+                    return;
+                }
+                // 观戏：情感+2，50%概率仇恨-1，50%概率仇恨+2
+                if (name === "观戏") {
+                    setStreetPoints(points - 1);
+                    const hateChange = Math.random() < 0.5 ? -1 : 2;
+                    gs.emotion = Math.min(999, (gs.emotion || 0) + 2);
+                    gs.hate = Math.max(0, (gs.hate || 0) + hateChange);
+                    saveStreetGame(gs);
+                    showActionResult("观戏", `情感+2，仇恨${hateChange >= 0 ? "+" : ""}${hateChange}`, `剩余行动点：${getStreetPoints()}点`);
+                    return;
+                }
+                // 藏书楼：文化+1，智力增加当前值的50%+1
+                if (name === "藏书楼") {
+                    setStreetPoints(points - 1);
+                    const intelAdd = Math.floor((gs.intellect || 0) * 0.5) + 1;
+                    gs.culture = Math.min(999, (gs.culture || 0) + 1);
+                    gs.intellect = Math.min(999, (gs.intellect || 0) + intelAdd);
+                    saveStreetGame(gs);
+                    showActionResult("藏书楼", `文化+1，智力+${intelAdd}`, `剩余行动点：${getStreetPoints()}点`);
+                    return;
+                }
+                // 大理寺：情感-1，仇恨+当前仇恨值50%+1
+                if (name === "大理寺") {
+                    setStreetPoints(points - 1);
+                    gs.emotion = Math.max(0, (gs.emotion || 0) - 1);
+                    const hateAdd = Math.floor((gs.hate || 0) * 0.5) + 1;
+                    gs.hate = Math.min(999, (gs.hate || 0) + hateAdd);
+                    saveStreetGame(gs);
+                    showActionResult("大理寺", `情感-1，仇恨+${hateAdd}`, `剩余行动点：${getStreetPoints()}点`);
+                    return;
+                }
+                // 衙门：情感-1
+                if (name === "衙门") {
+                    setStreetPoints(points - 1);
+                    gs.emotion = Math.max(0, (gs.emotion || 0) - 1);
+                    saveStreetGame(gs);
+                    showActionResult("衙门", "情感-1", `剩余行动点：${getStreetPoints()}点`);
+                    return;
+                }
+                // 医馆：治好当前所有疾病
+                if (name === "医馆") {
+                    setStreetPoints(points - 1);
+                    const hadIll = (gs.diseases || []).length > 0;
+                    gs.diseases = [];
+                    saveStreetGame(gs);
+                    showActionResult("医馆", hadIll ? "已治愈所有疾病" : "你身体健康，无需诊治", `剩余行动点：${getStreetPoints()}点`);
+                    return;
+                }
+                // 黑市：需16岁，首次提示，三选项（消耗1点行动点）
+                if (name === "黑市") {
+                    let raw = localStorage.getItem("skipMonthCount");
+                    let skip = raw ? Number(raw) : 0;
+                    let age = 8 + Math.floor(skip / 12);
+                    if (age < 16) {
+                        showActionResult("黑市", `你尚年幼（${age}岁），\n需满16岁才能进入黑市。`);
+                        return;
+                    }
+                    setStreetPoints(points - 1);
+                    if (localStorage.getItem("blackMarketIntroShown") !== "true") {
+                        localStorage.setItem("blackMarketIntroShown", "true");
+                        showActionResult("黑市", "你为何来此？\n这不是你痛苦的来源吗？", "", function () { showBlackChoice(gs); });
+                    } else {
+                        showBlackChoice(gs);
+                    }
+                    return;
+                }
+                if (!cfg) {
+                    showActionResult("提示", "此行动暂不可执行");
+                    return;
+                }
+                // 普通行动：消耗1点行动点
+                setStreetPoints(points - 1);
+                // 结算属性
+                const gains = [];
+                for (const k in cfg) {
+                    const add = getRandomInt(cfg[k][0], cfg[k][1]);
+                    gs[k] = Math.min(999, Math.max(0, (gs[k] || 0) + add));
+                    gains.push(`${ATTR_NAMES_S[k]}+${add}`);
+                }
+                saveStreetGame(gs);
+                showActionResult(name, gains.join("\n"), `消耗1点行动点（剩余${getStreetPoints()}点）`);
+            };
+        });
+        // 手机方向适配：竖屏显示横屏引导页；点击按钮进入全屏锁定横屏；iOS 降级为旋转画面
+        let rotateRequested = false;
+        function isMobileDevice() {
+            return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1;
+        }
+        function applyOrientation() {
+            const tip = document.getElementById("rotateTip");
+            if (!tip) return;
+            const mobile = isMobileDevice();
+            const portrait = window.innerHeight > window.innerWidth;
+            if (!mobile || !portrait) {
+                // 桌面或已横屏：正常显示
+                document.documentElement.classList.remove("portrait-rotate");
+                tip.classList.remove("show");
+                tip.classList.remove("minimized");
+                return;
+            }
+            if (rotateRequested) {
+                // 已尝试进入横屏但仍为竖屏（如 iOS 无法锁屏）：旋转画面兜底 + 顶部小提示
+                document.documentElement.classList.add("portrait-rotate");
+                tip.classList.add("show");
+                tip.classList.add("minimized");
+            } else {
+                // 未请求：显示引导页（不旋转画面）
+                document.documentElement.classList.remove("portrait-rotate");
+                tip.classList.add("show");
+                tip.classList.remove("minimized");
+            }
+        }
+        function enterLandscape() {
+            rotateRequested = true;
+            // 1) 请求全屏
+            try {
+                const el = document.documentElement;
+                if (el.requestFullscreen) el.requestFullscreen().catch(function () { });
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            } catch (e) { }
+            // 2) 尝试锁定横屏（Android Chrome 全屏后可锁；iOS 无此 API）
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    const p = screen.orientation.lock("landscape");
+                    if (p && p.catch) p.catch(function () { });
+                }
+            } catch (e) { }
+            // 3) 稍后按实际方向重算
+            setTimeout(applyOrientation, 600);
+        }
+        const rotateGoBtn = document.getElementById("rotateGoBtn");
+        if (rotateGoBtn) rotateGoBtn.onclick = enterLandscape;
+        applyOrientation();
+        window.addEventListener("resize", applyOrientation);
+        window.addEventListener("orientationchange", function () { setTimeout(applyOrientation, 300); });
+        document.addEventListener("fullscreenchange", function () { setTimeout(applyOrientation, 300); });
+        // 本版本不使用 Service Worker，避免旧缓存导致黑屏问题
+        // —— 兼容性兜底：清理旧 SW/缓存 + 为不支持容器查询单位(cqw)的浏览器注入 vw 近似样式 ——
+        (function () {
+            // 1) 主动注销残留的旧 Service Worker（同源）并清空缓存
+            if ('serviceWorker' in navigator) {
+                try {
+                    navigator.serviceWorker.getRegistrations().then(function (regs) {
+                        for (var i = 0; i < regs.length; i++) regs[i].unregister();
+                    })['catch'](function () { });
+                } catch (e) { }
+            }
+            if (window.caches && window.caches.keys) {
+                try {
+                    window.caches.keys().then(function (keys) {
+                        for (var j = 0; j < keys.length; j++) window.caches['delete'](keys[j]);
+                    })['catch'](function () { });
+                } catch (e) { }
+            }
+            // 2) 不支持 cqw/cqh（iOS Safari<16、旧版安卓/微信内核）时，把样式表里的
+            //    cqw/cqh 自动换算成 vw/vh 注入，避免布局失效导致黑屏/错乱
+            var supportsCq = false;
+            try { supportsCq = window.CSS && CSS.supports && CSS.supports('width', '1cqw'); } catch (e) { }
+            if (supportsCq) return;
+            try {
+                function collectCq(list) {
+                    var out = '';
+                    for (var i = 0; i < list.length; i++) {
+                        var rule = list[i];
+                        var sel = rule.selectorText;
+                        if (sel) {
+                            var st = rule.style;
+                            var props = [];
+                            for (var p = 0; p < st.length; p++) {
+                                var name = st[p] || st.item(p);
+                                var val = st.getPropertyValue(name);
+                                if (val.indexOf('cqw') < 0 && val.indexOf('cqh') < 0) continue;
+                                var imp = st.getPropertyPriority(name) ? ' !important' : '';
+                                var rep = val
+                                    .replace(/(-?[\d.]+)cqw/g, function (m, n) { return n + 'vw'; })
+                                    .replace(/(-?[\d.]+)cqh/g, function (m, n) { return n + 'vh'; });
+                                props.push(name + ':' + rep + imp);
+                            }
+                            if (props.length) out += sel + '{' + props.join(';') + '}';
+                            continue;
+                        }
+                        if (rule.cssRules) {
+                            var inner = collectCq(rule.cssRules);
+                            if (inner) {
+                                var cond = '';
+                                if (rule.media && rule.media.mediaText) cond = rule.media.mediaText;
+                                else if (rule.conditionText) cond = rule.conditionText;
+                                if (cond) out += '@media ' + cond + '{' + inner + '}';
+                                else out += inner;
+                            }
+                        }
+                    }
+                    return out;
+                }
+                var cssText = collectCq(document.styleSheets);
+                if (cssText) {
+                    var fb = document.createElement('style');
+                    fb.setAttribute('data-cq-fallback', '1');
+                    fb.textContent = cssText;
+                    document.head.appendChild(fb);
+                }
+            } catch (e) { }
+        })();
+    </script>
+</body>
+
+</html>

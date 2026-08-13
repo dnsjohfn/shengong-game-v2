@@ -1,0 +1,11 @@
+# VS Code
+.vscode/
+*.code-workspace
+
+# 系统
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# 缓存/临时
+*.log
